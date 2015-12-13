@@ -125,6 +125,8 @@ int main(int argc, char ** argv){
 	// Receives some test string to server...
 	while (true)
 	{
+		printf("Executing main loop");
+		ReadFromPipe();
 		strcpy(sendbuf, ReadFromPipe());
 		bytesSent = send(m_socket, sendbuf, strlen(sendbuf), 0);
 
@@ -156,13 +158,16 @@ char* ReadFromPipe(void)
 	CHAR chBuf[BUFSIZE];
 	BOOL bSuccess = FALSE;
 	HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-
+	CHAR oldChBuf[BUFSIZE] = "";
 	for (;;)
 	{
-		bSuccess = ReadFile(g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-		if (!bSuccess || dwRead == 0) break;
-
+		//bSuccess = ReadFile(g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL);
+		//if (!bSuccess || dwRead == 0) break;
+		PeekNamedPipe(g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL, NULL);
 		total += dwRead;
+		if (strcmp(chBuf, oldChBuf) == 0) break;
+		Sleep(250);
+		strcpy(oldChBuf, chBuf);
 		//bSuccess = WriteFile(hParentStdOut, chBuf, dwRead, &dwWritten, NULL);
 		//if (!bSuccess) break;
 	}
