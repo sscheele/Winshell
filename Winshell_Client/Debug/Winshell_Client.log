@@ -1,10 +1,15 @@
-﻿Build started 12/13/2015 12:49:52 PM.
+﻿Build started 12/14/2015 5:10:12 PM.
      1>Project "D:\Programs and Programming\Programming\C++\Winshell_Client\Winshell_Client.vcxproj" on node 2 (Build target(s)).
-     1>Link:
+     1>ClCompile:
+         D:\Programs and Programming\Misc. Programs\Visual Studio\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /sdl /Od /Oy- /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"Debug\\" /Fd"Debug\vc140.pdb" /Gd /TP /analyze- /errorReport:prompt Source.cpp
+         Source.cpp
+     1>d:\programs and programming\programming\c++\winshell_client\source.cpp(234): warning C4172: returning address of local variable or temporary: chBuf
+       Link:
          D:\Programs and Programming\Misc. Programs\Visual Studio\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"D:\Programs and Programming\Programming\C++\Winshell_Client\Debug\Winshell_Client.exe" /INCREMENTAL /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /Debug /PDB:"D:\Programs and Programming\Programming\C++\Winshell_Client\Debug\Winshell_Client.pdb" /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"D:\Programs and Programming\Programming\C++\Winshell_Client\Debug\Winshell_Client.lib" /MACHINE:X86 Debug\Source.obj
+         LINK : D:\Programs and Programming\Programming\C++\Winshell_Client\Debug\Winshell_Client.exe not found or not built by the last incremental link; performing full link
          Winshell_Client.vcxproj -> D:\Programs and Programming\Programming\C++\Winshell_Client\Debug\Winshell_Client.exe
      1>Done Building Project "D:\Programs and Programming\Programming\C++\Winshell_Client\Winshell_Client.vcxproj" (Build target(s)).
 
 Build succeeded.
 
-Time Elapsed 00:00:02.01
+Time Elapsed 00:00:01.56

