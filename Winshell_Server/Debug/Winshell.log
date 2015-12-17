@@ -1,4 +1,4 @@
-﻿Build started 12/13/2015 8:43:23 PM.
+﻿Build started 12/17/2015 12:24:00 PM.
      1>Project "D:\Programs and Programming\Programming\C++\Winshell\Winshell.vcxproj" on node 2 (Build target(s)).
      1>ClCompile:
          D:\Programs and Programming\Misc. Programs\Visual Studio\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /sdl /Od /Oy- /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"Debug\\" /Fd"Debug\vc140.pdb" /Gd /TP /analyze- /errorReport:prompt Source.cpp
@@ -10,4 +10,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:01.12
+Time Elapsed 00:00:00.95
